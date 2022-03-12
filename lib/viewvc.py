@@ -1785,7 +1785,40 @@ def markup_escaped_urls(s):
     return re.sub(_re_rewrite_escaped_url, _url_repl, s)
 
 
-def detect_encoding(text_block):
+def detect_encoding_by_chardet(text_block):
+    try:
+        import cchardet as chardet
+    except ImportError:
+        import chardet
+
+    # If chardet can confidently claimed a match, we'll use its
+    # findings.  (And if that match is 'ascii' -- which is a subset of
+    # utf-8 -- we'll just call it 'utf-8' and score a zero transform.)
+    resp = chardet.detect(text_block)
+    if resp.get("confidence") == 1.0:
+        encoding = resp.get("encoding")
+        if encoding == "ascii":
+            encoding = "utf-8"
+        return encoding
+    return None
+
+
+def detect_encoding_by_nkf(text_block):
+    import nkf
+    return nkf.nkf('g',text_block).lower()
+
+
+def detect_encoding_dispatch(engine, text_block):
+    enginelist = {
+        'chardet': detect_encoding_by_chardet,
+        'nkf': detect_encoding_by_nkf,
+    }
+    if engine in enginelist:
+        return enginelist[engine](text_block)
+    return None
+
+
+def detect_encoding(engine, text_block):
     """Return the encoding used by TEXT_BLOCK as detected by the chardet
     Python module.  (Currently, this is used only when syntax
     highlighting is not enabled/available; otherwise, Pygments does this
@@ -1804,20 +1837,7 @@ def detect_encoding(text_block):
 
     # If no recognized BOM, see if chardet can help us.
     try:
-        try:
-            import cchardet as chardet
-        except ImportError:
-            import chardet
-
-        # If chardet can confidently claimed a match, we'll use its
-        # findings.  (And if that match is 'ascii' -- which is a subset of
-        # utf-8 -- we'll just call it 'utf-8' and score a zero transform.)
-        resp = chardet.detect(text_block)
-        if resp.get("confidence") == 1.0:
-            encoding = resp.get("encoding")
-            if encoding == "ascii":
-                encoding = "utf-8"
-            return encoding
+        return detect_encoding_dispatch(engine, text_block)
     except Exception:
         pass
 
@@ -2146,7 +2166,8 @@ def markup_or_annotate(request, is_annotate):
                 text_block = text_block + file_lines[i]
                 if len(text_block) >= 2048:
                     break
-            encoding = detect_encoding(text_block)
+            engine = cfg.options.detect_encoding_engine
+            encoding = detect_encoding(engine, text_block)
         if not encoding:
             encoding = request.repos.encoding
 

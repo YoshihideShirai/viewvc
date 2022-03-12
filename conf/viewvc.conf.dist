@@ -784,6 +784,11 @@
 ##
 #detect_encoding = 0
 
+## detect_encoding_engine: Engine of detect encoding.
+## following set:
+##   chardet, nkf
+#detect_encoding_engine = 'chardet'
+
 ## use_cvsgraph: Use CvsGraph to offer visual graphs of CVS revision history.
 ##
 #use_cvsgraph = 0
